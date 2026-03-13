@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -61,7 +61,7 @@ def test_email(config_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/check-now")
-def check_now(db: Session = Depends(get_db)):
+def check_now(include_read: bool = Query(False, description="是否包含已读邮件（首次导入时用）"), db: Session = Depends(get_db)):
     """立即检查所有活跃邮箱"""
-    results = check_email_for_resumes(db)
+    results = check_email_for_resumes(db, include_read=include_read)
     return {"message": f"检查完成，导入 {len(results)} 份简历", "results": results}

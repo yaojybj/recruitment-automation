@@ -31,18 +31,107 @@ def parse_resume_file(file_path: str) -> dict:
     return extract_structured_data(text)
 
 
+def is_boss_resume_email(subject: str) -> bool:
+    """判断是否是 Boss 直聘简历通知邮件（而非聊天、面试确认等）"""
+    if "BOSS直聘" not in subject and "BOSS 直聘" not in subject:
+        return False
+    resume_keywords = ["应聘", "简历", "投递", "候选人", "发了一封简历"]
+    exclude_keywords = ["面试", "确认", "提醒", "转正", "入职", "通知"]
+    has_resume_kw = any(kw in subject for kw in resume_keywords)
+    # 主题格式: 姓名 | 描述，应聘 岗位 | 薪资【BOSS直聘】
+    has_boss_format = bool(re.search(r".+\|.+\|.+【BOSS直聘】", subject))
+    if has_resume_kw or has_boss_format:
+        ad_keywords = ["支持驻外", "活动", "优惠", "升级", "邀请您", "调研"]
+        if any(kw in subject for kw in ad_keywords):
+            return False
+        return True
+    return False
+
+
 def parse_boss_email(subject: str, body: str) -> dict:
-    """解析 Boss 直聘发送的简历通知邮件"""
-    data = extract_structured_data(body)
-    title_match = re.search(r"收到.*?(?:的|投递).*?简历", subject)
+    """
+    解析 Boss 直聘简历通知邮件。
+    主题格式: 张钰 | 26年应届生，应聘 游戏策划 (MJ008969) | 北京18-30K【BOSS直聘】
+    正文: HTML，包含候选人基本信息（姓名、性别、年龄、城市、学历、经验、公司·职位）
+    """
+    data = _parse_boss_subject(subject)
+    body_data = _parse_boss_body(body)
+    for key, val in body_data.items():
+        if val and not data.get(key):
+            data[key] = val
     if not data.get("candidate_name"):
-        name_match = re.search(r"([^\s·]+)\s*(?:投递|应聘)", subject)
-        if name_match:
-            data["candidate_name"] = name_match.group(1)
-    position_match = re.search(r"(?:投递|应聘)[了]?\s*[《「]?(.+?)[》」]?\s*(?:岗位|职位)?", subject)
-    if position_match:
-        data["applied_position"] = position_match.group(1).strip()
+        fallback = extract_structured_data(body)
+        for key, val in fallback.items():
+            if val and not data.get(key):
+                data[key] = val
     data["raw_text"] = f"主题: {subject}\n\n{body}"
+    return data
+
+
+def _parse_boss_subject(subject: str) -> dict:
+    """从主题行提取: 姓名 | 描述，应聘 岗位 (编号) | 城市 薪资【BOSS直聘】"""
+    data = {}
+    subject = subject.replace("【BOSS直聘】", "").replace("【BOSS 直聘】", "").strip()
+    parts = [p.strip() for p in subject.split("|")]
+    if len(parts) >= 1:
+        data["candidate_name"] = parts[0].strip()
+    if len(parts) >= 2:
+        desc = parts[1]
+        pos_match = re.search(r"应聘\s*(.+?)(?:\s*\(|$)", desc)
+        if pos_match:
+            data["applied_position"] = pos_match.group(1).strip()
+        years_match = re.search(r"(\d+)年", desc)
+        if years_match:
+            data["work_years"] = float(years_match.group(1))
+        if "应届" in desc:
+            data["work_years"] = 0.0
+    if len(parts) >= 3:
+        loc_salary = parts[2]
+        city_match = re.search(r"([\u4e00-\u9fa5]{2,4})", loc_salary)
+        if city_match:
+            data["city"] = city_match.group(1)
+        sal_match = re.search(r"(\d+)-(\d+)[kK]", loc_salary)
+        if sal_match:
+            data["expected_salary_min"] = int(sal_match.group(1)) * 1000
+            data["expected_salary_max"] = int(sal_match.group(2)) * 1000
+    return data
+
+
+def _parse_boss_body(body: str) -> dict:
+    """
+    从 Boss 直聘邮件正文（HTML 已转为文本）提取候选人详细信息。
+    正文结构中包含: 姓名 性别 年龄 城市 学历 经验 公司·职位
+    """
+    data = {}
+    name_match = re.search(r"(?:^|\n)\s*(\S{2,4})\s*(?:男|女)\s*\d{2}岁", body)
+    if name_match:
+        data["candidate_name"] = name_match.group(1).strip()
+    gender_match = re.search(r"(?:^|\s)(男|女)\s*\d{2}岁", body)
+    if gender_match:
+        data["gender"] = gender_match.group(1)
+    age_match = re.search(r"(\d{2})岁", body)
+    if age_match:
+        age = int(age_match.group(1))
+        if 18 <= age <= 65:
+            data["age"] = age
+    city_match = re.search(r"\d{2}岁\s*\n?\s*([\u4e00-\u9fa5]{2,5})\s*\n", body)
+    if city_match:
+        data["city"] = city_match.group(1).strip()
+    edu_match = re.search(r"(博士|硕士|MBA|本科|大专|中专|高中)", body)
+    if edu_match:
+        data["education"] = edu_match.group(1)
+    years_match = re.search(r"(\d+)年(?:以上)?(?:经验|工作经验)?", body)
+    if years_match:
+        data["work_years"] = float(years_match.group(1))
+    if "应届" in body:
+        data.setdefault("work_years", 0.0)
+    company_pos_match = re.search(r"\n\s*(.{2,30})\s*·\s*(.{2,20})\s*\n", body)
+    if company_pos_match:
+        data["current_company"] = company_pos_match.group(1).strip()
+        data["current_position"] = company_pos_match.group(2).strip()
+    school_match = re.search(r"(\S+(?:大学|学院|学校|University|College))", body)
+    if school_match:
+        data["school"] = school_match.group(1)
     return data
 
 

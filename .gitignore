@@ -11,6 +11,10 @@ node_modules/
 dist/
 
 # Uploads
+backend/uploads/*.pdf
+backend/uploads/*.docx
+backend/uploads/*.doc
+backend/uploads/*.txt
 backend/uploads/inbox/*
 backend/uploads/archived/*
 !backend/uploads/inbox/.gitkeep
