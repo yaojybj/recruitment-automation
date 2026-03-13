@@ -30,6 +30,7 @@ class ResumeSource(str, enum.Enum):
     EMAIL = "email"
     MANUAL_UPLOAD = "manual_upload"
     FOLDER_IMPORT = "folder_import"
+    BOSS_EXTENSION = "boss_extension"
 
 
 class RuleOperator(str, enum.Enum):
@@ -101,7 +102,7 @@ class Resume(Base):
     education_history = Column(JSON, default=list)
     raw_text = Column(Text)
     file_path = Column(String(500))
-    source = Column(SAEnum(ResumeSource), default=ResumeSource.MANUAL_UPLOAD)
+    source = Column(String(50), default="manual_upload")
     status = Column(SAEnum(ResumeStatus), default=ResumeStatus.PENDING)
     position_id = Column(Integer, ForeignKey("positions.id"), nullable=True)
     screening_score = Column(Float)
@@ -212,19 +213,6 @@ class PipelineLog(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     resume = relationship("Resume")
-
-
-class MokaConfig(Base):
-    """Moka API 配置"""
-    __tablename__ = "moka_configs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    api_base_url = Column(String(300), default="https://api.mokahr.com")
-    api_key = Column(String(300))
-    client_id = Column(String(200))
-    client_secret = Column(String(500))
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class BossConfig(Base):

@@ -1,142 +1,84 @@
 """
-Moka 适配器
-负责与 Moka 招聘系统对接：推荐简历给用人部门、创建面试安排。
-
-实现方式预留两种：
-1. API 对接（需要 Moka 开放 API 权限）
-2. Webhook 通知（通过邮件/企业微信通知用人部门）
+Moka 同步助手（手动模式）
+Moka API 因集团权限不可用，改为：
+- 系统内完成所有审核/约面流程
+- 面试确定后生成 Moka 录入指引，HR 手动录入一次即可
 """
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
-import httpx
 from sqlalchemy.orm import Session
 
-from ..models import Resume, Position, MokaConfig, PipelineLog
+from ..models import Resume, Position, InterviewSlot
 
 logger = logging.getLogger(__name__)
 
 
-class MokaAdapter:
-    def __init__(self, config: MokaConfig):
-        self.base_url = config.api_base_url or "https://api.mokahr.com"
-        self.api_key = config.api_key
-        self.client_id = config.client_id
-        self.client_secret = config.client_secret
-        self._token = None
+def generate_moka_entry_guide(
+    db: Session,
+    resume: Resume,
+    position: Position,
+    slot: InterviewSlot | None = None,
+) -> dict:
+    """
+    生成 Moka 手动录入指引。
+    HR 在面试安排确定后，按指引在 Moka 中录入候选人和面试信息。
+    """
+    candidate_info = {
+        "姓名": resume.candidate_name or "",
+        "手机": resume.phone or "",
+        "邮箱": resume.email or "",
+        "学历": resume.education or "",
+        "工作年限": f"{resume.work_years}年" if resume.work_years else "",
+        "当前公司": resume.current_company or "",
+        "当前职位": resume.current_position or "",
+    }
 
-    def _get_headers(self) -> dict:
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+    guide_lines = [
+        f"=== Moka 录入指引 ===",
+        f"",
+        f"【候选人信息】",
+    ]
+    for k, v in candidate_info.items():
+        if v:
+            guide_lines.append(f"  {k}: {v}")
 
-    def recommend_candidate(
-        self,
-        resume: Resume,
-        position: Position,
-    ) -> dict:
-        """
-        推荐简历到 Moka。
-        如果有 API 权限就走 API；没有就返回需要手动操作的提示。
-        """
-        if not self.api_key:
-            return {
-                "success": False,
-                "method": "manual",
-                "message": f"请手动在 Moka 中为「{position.title}」岗位添加候选人「{resume.candidate_name}」",
-                "candidate_info": {
-                    "name": resume.candidate_name,
-                    "phone": resume.phone,
-                    "email": resume.email,
-                    "position": position.title,
-                    "jd_match_score": resume.jd_match_score,
-                },
-            }
+    guide_lines.append(f"")
+    guide_lines.append(f"【应聘岗位】{position.title}")
+    if position.department:
+        guide_lines.append(f"【部门】{position.department}")
 
-        try:
-            payload = {
-                "name": resume.candidate_name,
-                "phone": resume.phone,
-                "email": resume.email,
-                "job_id": position.moka_job_id,
-            }
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    f"{self.base_url}/api/v1/candidates",
-                    headers=self._get_headers(),
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return {
-                    "success": True,
-                    "method": "api",
-                    "moka_candidate_id": data.get("id"),
-                    "moka_application_id": data.get("application_id"),
-                }
-        except Exception as e:
-            logger.error(f"Moka API 推荐失败: {e}")
-            return {"success": False, "method": "api", "error": str(e)}
+    guide_lines.append(f"【JD匹配分】{resume.jd_match_score or '-'}")
 
-    def create_interview(
-        self,
-        resume: Resume,
-        position: Position,
-        interview_date: str,
-        start_time: str,
-        end_time: str,
-        interviewer_email: str = "",
-        location: str = "",
-        meeting_link: str = "",
-    ) -> dict:
-        """在 Moka 上创建面试安排"""
-        if not self.api_key:
-            return {
-                "success": False,
-                "method": "manual",
-                "message": (
-                    f"请手动在 Moka 中安排面试:\n"
-                    f"候选人: {resume.candidate_name}\n"
-                    f"岗位: {position.title}\n"
-                    f"时间: {interview_date} {start_time}-{end_time}\n"
-                    f"面试官: {interviewer_email}\n"
-                    f"地点: {location or meeting_link}"
-                ),
-            }
+    if slot:
+        guide_lines.append(f"")
+        guide_lines.append(f"【面试安排】")
+        guide_lines.append(f"  日期: {slot.date}")
+        guide_lines.append(f"  时间: {slot.start_time} - {slot.end_time}")
+        if slot.interviewer_name:
+            guide_lines.append(f"  面试官: {slot.interviewer_name}")
+        if slot.is_online:
+            guide_lines.append(f"  方式: 线上面试")
+            if slot.meeting_link:
+                guide_lines.append(f"  会议链接: {slot.meeting_link}")
+        else:
+            guide_lines.append(f"  方式: 线下面试")
+            if slot.location:
+                guide_lines.append(f"  地点: {slot.location}")
 
-        try:
-            payload = {
-                "application_id": resume.moka_application_id,
-                "stage_id": position.moka_stage_id,
-                "start_time": f"{interview_date}T{start_time}:00",
-                "end_time": f"{interview_date}T{end_time}:00",
-                "interviewer_emails": [interviewer_email] if interviewer_email else [],
-                "location": location,
-                "online_meeting_link": meeting_link,
-            }
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    f"{self.base_url}/api/v1/interviews",
-                    headers=self._get_headers(),
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return {
-                    "success": True,
-                    "method": "api",
-                    "interview_id": data.get("id"),
-                }
-        except Exception as e:
-            logger.error(f"Moka API 创建面试失败: {e}")
-            return {"success": False, "method": "api", "error": str(e)}
+    guide_lines.append(f"")
+    guide_lines.append(f"【操作步骤】")
+    guide_lines.append(f"  1. 打开 Moka → 找到「{position.title}」岗位")
+    guide_lines.append(f"  2. 添加候选人 → 填入以上信息")
+    if slot:
+        guide_lines.append(f"  3. 进入候选人详情 → 安排面试")
+        guide_lines.append(f"  4. 选择面试时间 {slot.date} {slot.start_time}")
+        if slot.interviewer_name:
+            guide_lines.append(f"  5. 添加面试官: {slot.interviewer_name}")
 
-
-def get_moka_adapter(db: Session) -> Optional[MokaAdapter]:
-    config = db.query(MokaConfig).filter(MokaConfig.is_active == True).first()
-    if config:
-        return MokaAdapter(config)
-    return None
+    return {
+        "guide_text": "\n".join(guide_lines),
+        "candidate_info": candidate_info,
+        "position_title": position.title,
+        "has_interview": slot is not None,
+    }

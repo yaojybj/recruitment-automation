@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -17,7 +17,8 @@ from ..services.boss_adapter import (
     generate_interview_message, mark_message_sent,
     submit_candidate_reply, get_pending_contacts, get_awaiting_replies,
 )
-from ..services.moka_adapter import get_moka_adapter
+from ..services.dept_review import generate_batch_review_links, generate_review_summary_email
+from ..services.moka_adapter import generate_moka_entry_guide
 
 router = APIRouter(prefix="/pipeline", tags=["招聘流程"])
 
@@ -75,7 +76,7 @@ def advance(resume_id: int, req: StatusAdvanceRequest, db: Session = Depends(get
     return result
 
 
-# ── 推荐给用人部门 ──
+# ── 推荐给用人部门（系统内审核） ──
 
 class RecommendRequest(BaseModel):
     resume_ids: list[int]
@@ -84,20 +85,35 @@ class RecommendRequest(BaseModel):
 @router.post("/recommend")
 def recommend(req: RecommendRequest, db: Session = Depends(get_db)):
     results = recommend_to_dept(db, req.resume_ids, "hr")
-    moka = get_moka_adapter(db)
-    moka_results = []
-    if moka:
-        for r in results:
-            if r.get("success"):
-                resume = db.query(Resume).get(r["resume_id"])
-                if resume and resume.position:
-                    mr = moka.recommend_candidate(resume, resume.position)
-                    moka_results.append({"resume_id": r["resume_id"], **mr})
-                    if mr.get("moka_candidate_id"):
-                        resume.moka_candidate_id = mr["moka_candidate_id"]
-                        resume.moka_application_id = mr.get("moka_application_id")
-                        db.commit()
-    return {"pipeline_results": results, "moka_results": moka_results}
+    return {"results": results}
+
+
+class NotifyDeptRequest(BaseModel):
+    resume_ids: list[int]
+    reviewer_name: str = ""
+    base_url: str = ""
+
+
+@router.post("/notify-dept")
+def notify_dept(req: NotifyDeptRequest, db: Session = Depends(get_db)):
+    """生成发给用人部门的审核通知内容（用于邮件/企微/钉钉发送）"""
+    if not req.resume_ids:
+        raise HTTPException(400, "请选择简历")
+
+    first_resume = db.query(Resume).get(req.resume_ids[0])
+    if not first_resume or not first_resume.position:
+        raise HTTPException(400, "简历未关联岗位")
+
+    position = first_resume.position
+    email_content = generate_review_summary_email(
+        db, req.resume_ids, position, req.reviewer_name, req.base_url
+    )
+    review_links = generate_batch_review_links(db, req.resume_ids, req.base_url)
+
+    return {
+        "email": email_content,
+        "review_links": review_links,
+    }
 
 
 # ── 用人部门审核 ──
@@ -116,16 +132,17 @@ def review(resume_id: int, req: DeptReviewRequest, db: Session = Depends(get_db)
     return result
 
 
+class BatchReviewRequest(BaseModel):
+    resume_ids: list[int]
+    approved: bool
+    reviewer: str = ""
+
+
 @router.post("/dept-review-batch")
-def review_batch(
-    resume_ids: list[int],
-    approved: bool,
-    reviewer: str = "",
-    db: Session = Depends(get_db),
-):
+def review_batch(req: BatchReviewRequest, db: Session = Depends(get_db)):
     results = []
-    for rid in resume_ids:
-        r = dept_review(db, rid, approved, reviewer)
+    for rid in req.resume_ids:
+        r = dept_review(db, rid, req.approved, req.reviewer)
         results.append({"resume_id": rid, **r})
     return results
 
@@ -176,11 +193,10 @@ def candidate_reply(resume_id: int, req: CandidateReplyRequest, db: Session = De
     return result
 
 
-# ── 面试安排 ──
+# ── 面试安排（系统内 + Moka 手动指引） ──
 
 @router.post("/schedule-interview/{resume_id}")
 def schedule_interview(resume_id: int, db: Session = Depends(get_db)):
-    """在 Moka 上安排面试"""
     resume = db.query(Resume).get(resume_id)
     if not resume:
         raise HTTPException(404, "简历不存在")
@@ -190,26 +206,28 @@ def schedule_interview(resume_id: int, db: Session = Depends(get_db)):
         raise HTTPException(400, "简历未关联岗位")
 
     slot = resume.interview_slot
-    moka = get_moka_adapter(db)
-    moka_result = {}
-    if moka:
-        moka_result = moka.create_interview(
-            resume=resume,
-            position=resume.position,
-            interview_date=slot.date,
-            start_time=slot.start_time,
-            end_time=slot.end_time,
-            interviewer_email=slot.interviewer_email or "",
-            location=slot.location or "",
-            meeting_link=slot.meeting_link or "",
-        )
+
+    moka_guide = generate_moka_entry_guide(db, resume, resume.position, slot)
 
     result = advance_status(
         db, resume_id, "interview_scheduled",
         f"面试已安排: {slot.date} {slot.start_time}-{slot.end_time}",
         "system",
     )
-    return {"pipeline": result, "moka": moka_result}
+    return {
+        "pipeline": result,
+        "moka_guide": moka_guide,
+    }
+
+
+@router.get("/moka-guide/{resume_id}")
+def get_moka_guide(resume_id: int, db: Session = Depends(get_db)):
+    """获取某个候选人的 Moka 录入指引"""
+    resume = db.query(Resume).get(resume_id)
+    if not resume or not resume.position:
+        raise HTTPException(400, "简历不存在或未关联岗位")
+    guide = generate_moka_entry_guide(db, resume, resume.position, resume.interview_slot)
+    return guide
 
 
 # ── 流程看板 ──

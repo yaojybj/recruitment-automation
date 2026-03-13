@@ -9,7 +9,7 @@ from .database import init_db, SessionLocal
 from .services.email_monitor import check_email_for_resumes
 from .services.folder_watcher import scan_folder
 from .services.jd_matcher import auto_match_new_resumes
-from .api import positions, resumes, rules, screening, email_config, dashboard, pipeline, interview_slots
+from .api import positions, resumes, rules, screening, email_config, dashboard, pipeline, interview_slots, extension
 
 logging.basicConfig(
     level=logging.INFO,
@@ -94,6 +94,7 @@ app.include_router(screening.router, prefix="/api")
 app.include_router(email_config.router, prefix="/api")
 app.include_router(pipeline.router, prefix="/api")
 app.include_router(interview_slots.router, prefix="/api")
+app.include_router(extension.router, prefix="/api")
 
 
 @app.get("/api/health")

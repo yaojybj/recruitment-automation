@@ -10,9 +10,9 @@ import {
 } from '@ant-design/icons';
 import {
   getPositions, getPipelineSummary, getPipelineByStatus,
-  recommendToDept, deptReview, generateMessage, markMessageSent,
+  recommendToDept, notifyDept, deptReview, generateMessage, markMessageSent,
   submitCandidateReply, scheduleInterview, jdMatchBatch,
-  getResumeTimeline, triggerAutoMatch,
+  getResumeTimeline, triggerAutoMatch, getMokaGuide,
 } from '../api';
 
 const { TextArea } = Input;
@@ -125,10 +125,24 @@ export default function Pipeline() {
   const handleSchedule = async (id: number) => {
     try {
       const res = await scheduleInterview(id);
-      if (res.data.moka?.method === 'manual') {
-        Modal.info({ title: 'Moka 操作指引', content: res.data.moka.message, width: 500 });
-      }
       message.success('面试已安排');
+      if (res.data.moka_guide?.guide_text) {
+        Modal.info({
+          title: 'Moka 录入指引',
+          width: 560,
+          content: (
+            <div>
+              <p style={{ color: '#666', marginBottom: 8 }}>面试已在系统中安排，请按以下指引在 Moka 中同步录入：</p>
+              <TextArea value={res.data.moka_guide.guide_text} rows={14} readOnly
+                style={{ background: '#fafafa', fontFamily: 'monospace', fontSize: 12 }} />
+              <Button size="small" style={{ marginTop: 8 }} icon={<CopyOutlined />}
+                onClick={() => { navigator.clipboard.writeText(res.data.moka_guide.guide_text); message.success('已复制'); }}>
+                复制指引
+              </Button>
+            </div>
+          ),
+        });
+      }
       refreshData();
     } catch (e: any) {
       message.error(e.response?.data?.detail || '安排失败');
@@ -241,6 +255,29 @@ export default function Pipeline() {
       { title: '面试时间', dataIndex: 'interview_time', width: 200 },
       { title: '岗位', dataIndex: 'position_title', width: 120 },
       { title: '状态', render: () => <Tag color="success">已安排</Tag>, width: 80 },
+      {
+        title: 'Moka',
+        width: 120,
+        render: (_: any, r: any) => (
+          <Button size="small" onClick={async () => {
+            const res = await getMokaGuide(r.id);
+            Modal.info({
+              title: 'Moka 录入指引',
+              width: 520,
+              content: (
+                <div>
+                  <TextArea value={res.data.guide_text} rows={12} readOnly
+                    style={{ background: '#fafafa', fontFamily: 'monospace', fontSize: 12 }} />
+                  <Button size="small" style={{ marginTop: 8 }} icon={<CopyOutlined />}
+                    onClick={() => { navigator.clipboard.writeText(res.data.guide_text); message.success('已复制'); }}>
+                    复制
+                  </Button>
+                </div>
+              ),
+            });
+          }}>录入指引</Button>
+        ),
+      },
     ],
   };
 
@@ -321,6 +358,39 @@ export default function Pipeline() {
             <Badge color={STAGES.find((s) => s.key === activeStage)?.color} />
             {STAGES.find((s) => s.key === activeStage)?.label}
             <Tag>{stageResumes.length} 人</Tag>
+          </Space>
+        }
+        extra={
+          <Space>
+            {activeStage === 'jd_matched' && stageResumes.length > 0 && (
+              <>
+                <Button onClick={() => handleRecommend(stageResumes.map((r: any) => r.id))}>
+                  全部推荐给用人部门
+                </Button>
+                <Button type="primary" onClick={async () => {
+                  const ids = stageResumes.map((r: any) => r.id);
+                  await handleRecommend(ids);
+                  const res = await notifyDept(ids);
+                  Modal.info({
+                    title: res.data.email.subject,
+                    width: 600,
+                    content: (
+                      <div>
+                        <p style={{ color: '#666', marginBottom: 8 }}>以下内容可直接发送给用人部门（邮件/企微/钉钉）：</p>
+                        <TextArea value={res.data.email.body} rows={12} readOnly
+                          style={{ background: '#fafafa', fontFamily: 'monospace' }} />
+                        <Button size="small" style={{ marginTop: 8 }} icon={<CopyOutlined />}
+                          onClick={() => { navigator.clipboard.writeText(res.data.email.body); message.success('已复制'); }}>
+                          复制通知内容
+                        </Button>
+                      </div>
+                    ),
+                  });
+                }}>
+                  推荐并生成通知
+                </Button>
+              </>
+            )}
           </Space>
         }
       >

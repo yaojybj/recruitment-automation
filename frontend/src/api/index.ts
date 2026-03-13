@@ -73,8 +73,13 @@ export const advanceStatus = (resumeId: number, data: any) =>
   api.post(`/pipeline/advance/${resumeId}`, data);
 export const recommendToDept = (resumeIds: number[]) =>
   api.post('/pipeline/recommend', { resume_ids: resumeIds });
+export const notifyDept = (resumeIds: number[], reviewerName = '', baseUrl = '') =>
+  api.post('/pipeline/notify-dept', { resume_ids: resumeIds, reviewer_name: reviewerName, base_url: baseUrl });
 export const deptReview = (resumeId: number, data: any) =>
   api.post(`/pipeline/dept-review/${resumeId}`, data);
+export const deptReviewBatch = (resumeIds: number[], approved: boolean, reviewer = '') =>
+  api.post('/pipeline/dept-review-batch', { resume_ids: resumeIds, approved, reviewer });
+export const getMokaGuide = (resumeId: number) => api.get(`/pipeline/moka-guide/${resumeId}`);
 export const getPendingContacts = (positionId?: number) =>
   api.get('/pipeline/pending-contacts', { params: positionId ? { position_id: positionId } : {} });
 export const generateMessage = (resumeId: number) =>
@@ -101,5 +106,10 @@ export const createInterviewSlotsBatch = (slots: any[]) =>
   api.post('/interview-slots/batch', { slots });
 export const updateInterviewSlot = (id: number, data: any) => api.put(`/interview-slots/${id}`, data);
 export const deleteInterviewSlot = (id: number) => api.delete(`/interview-slots/${id}`);
+
+// ── Extension (Chrome 插件) ──
+export const extensionImportCandidate = (data: any) => api.post('/extension/import-candidate', data);
+export const extensionSearch = (params: any) => api.get('/extension/search', { params });
+export const extensionBatchImport = (candidates: any[]) => api.post('/extension/batch-import', candidates);
 
 export default api;

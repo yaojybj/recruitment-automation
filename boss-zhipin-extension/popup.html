@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #333;
+      background: #fff;
+    }
+    .header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #00BEAB, #00A89D);
+      color: #fff;
+    }
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+
+    .section {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+    }
+    .toggle-row label { font-size: 13px; }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc;
+      border-radius: 22px;
+      transition: 0.3s;
+    }
+    .toggle .slider::before {
+      content: "";
+      position: absolute;
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    .toggle input:checked + .slider { background: #00BEAB; }
+    .toggle input:checked + .slider::before { transform: translateX(18px); }
+
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: #00BEAB;
+      box-shadow: 0 0 0 2px rgba(0,190,171,0.15);
+    }
+
+    .status-bar {
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.ok { background: #52c41a; }
+    .status-dot.err { background: #ff4d4f; }
+    .status-dot.loading { background: #faad14; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 8px 0;
+    }
+    .stat-item {
+      text-align: center;
+      padding: 8px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+    .stat-num {
+      font-size: 20px;
+      font-weight: 700;
+      color: #00BEAB;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-primary { background: #00BEAB; color: #fff; }
+    .btn-primary:hover { background: #00A89D; }
+    .btn-secondary { background: #f5f5f5; color: #666; margin-top: 6px; }
+    .btn-secondary:hover { background: #e8e8e8; }
+    .btn-link { background: none; color: #00BEAB; text-align: left; padding: 4px 0; font-weight: 400; }
+
+    .msg {
+      padding: 8px 12px;
+      margin: 10px 0 0;
+      border-radius: 6px;
+      font-size: 12px;
+      display: none;
+    }
+    .msg.success { display: block; background: #e6f7e9; color: #1a8c35; }
+    .msg.error { display: block; background: #fff1f0; color: #cf1322; }
+
+    .tips {
+      padding: 12px 20px;
+      font-size: 11px;
+      color: #999;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Boss直聘 招聘自动化助手</h1>
+    <p>一键导入简历 · JD匹配 · 自动约面</p>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <span class="status-dot loading" id="statusDot"></span>
+    <span id="statusText">正在连接后台...</span>
+  </div>
+
+  <div class="section">
+    <div class="toggle-row">
+      <label>启用助手</label>
+      <div class="toggle">
+        <input type="checkbox" id="enabled" checked>
+        <span class="slider"></span>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label>自动导入浏览的候选人</label>
+      <div class="toggle">
+        <input type="checkbox" id="autoImport">
+        <span class="slider"></span>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label>显示匹配分徽章</label>
+      <div class="toggle">
+        <input type="checkbox" id="showBadge" checked>
+        <span class="slider"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">后台连接</div>
+    <div class="field">
+      <label>后台地址（后端 API）</label>
+      <input type="text" id="backendUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+    </div>
+    <div class="field">
+      <label>默认关联岗位</label>
+      <select id="defaultPosition">
+        <option value="">不关联 / 稍后手动选择</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section" id="statsSection" style="display:none;">
+    <div class="section-title">今日统计</div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-num" id="statImported">0</div>
+        <div class="stat-label">已导入</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="statMatched">0</div>
+        <div class="stat-label">匹配通过</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="statInterview">0</div>
+        <div class="stat-label">待约面</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <button class="btn btn-primary" id="saveBtn">保存设置</button>
+    <button class="btn btn-secondary" id="openDashboard">打开管理后台</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="tips">
+    使用方法：<br>
+    1. 确保招聘自动化后台已启动（start.sh）<br>
+    2. 打开 Boss 直聘候选人列表/聊天页面<br>
+    3. 候选人卡片上会自动显示操作按钮和匹配分<br>
+    4. 点击"导入"一键将简历同步到后台
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

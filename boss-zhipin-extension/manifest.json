@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Boss直聘 招聘自动化助手",
+  "version": "1.0.0",
+  "description": "在 Boss 直聘中一键导入简历、显示 JD 匹配分、生成约面消息，与招聘自动化后台无缝对接",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://www.zhipin.com/*",
+    "https://*.zhipin.com/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.zhipin.com/*", "https://*.zhipin.com/*"],
+      "js": ["lib/screening.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "招聘自动化助手"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
