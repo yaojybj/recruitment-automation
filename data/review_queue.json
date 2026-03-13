@@ -1,0 +1,206 @@
+[
+  {
+    "id": "C001",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "张三",
+    "phone": "13800001111",
+    "city": "北京",
+    "education": "本科",
+    "total_work_years": 5,
+    "expected_salary": "20000-30000",
+    "skills": [
+      "AE",
+      "PR",
+      "C4D",
+      "Photoshop",
+      "Illustrator"
+    ],
+    "applied_position": "视觉设计师",
+    "match_score": 89,
+    "score_breakdown": {
+      "行业匹配": 12,
+      "项目经验": 20,
+      "技能熟练度": 27,
+      "稳定性": 8,
+      "学历加分": 7,
+      "作品集加分": 15
+    },
+    "risk_flags": [],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": true,
+    "project_count": 6,
+    "created_at": "2026-03-10T17:46:49.855965"
+  },
+  {
+    "id": "C004",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "赵六",
+    "phone": "13800004444",
+    "city": "北京",
+    "education": "本科",
+    "total_work_years": 7,
+    "expected_salary": "30000-45000",
+    "skills": [
+      "Java",
+      "Spring",
+      "MySQL",
+      "Redis",
+      "Kafka",
+      "Docker"
+    ],
+    "applied_position": "后端开发工程师",
+    "match_score": 90,
+    "score_breakdown": {
+      "行业匹配": 12,
+      "项目经验": 30,
+      "技能熟练度": 29,
+      "稳定性": 12,
+      "学历加分": 7,
+      "作品集加分": 0
+    },
+    "risk_flags": [],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": false,
+    "project_count": 8,
+    "created_at": "2026-03-10T17:46:49.856006"
+  },
+  {
+    "id": "C005",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "钱七",
+    "phone": "13800005555",
+    "city": "杭州",
+    "education": "本科",
+    "total_work_years": 4,
+    "expected_salary": "25000-40000",
+    "skills": [
+      "Java",
+      "Spring",
+      "PostgreSQL",
+      "Redis"
+    ],
+    "applied_position": "后端开发工程师",
+    "match_score": 85,
+    "score_breakdown": {
+      "行业匹配": 10,
+      "项目经验": 30,
+      "技能熟练度": 28,
+      "稳定性": 10,
+      "学历加分": 7,
+      "作品集加分": 0
+    },
+    "risk_flags": [],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": false,
+    "project_count": 5,
+    "created_at": "2026-03-10T17:46:49.856015"
+  },
+  {
+    "id": "C007",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "周九",
+    "phone": "13800007777",
+    "city": "北京",
+    "education": "硕士",
+    "total_work_years": 8,
+    "expected_salary": "35000-50000",
+    "skills": [
+      "需求分析",
+      "产品设计",
+      "数据分析",
+      "用户研究"
+    ],
+    "applied_position": "产品经理",
+    "match_score": 91,
+    "score_breakdown": {
+      "行业匹配": 21,
+      "项目经验": 30,
+      "技能熟练度": 18,
+      "稳定性": 12,
+      "学历加分": 10,
+      "作品集加分": 0
+    },
+    "risk_flags": [
+      "薪资偏高: 期望35000-50000, 岗位上限45000"
+    ],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": false,
+    "project_count": 10,
+    "created_at": "2026-03-10T17:46:49.856032"
+  },
+  {
+    "id": "C008",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "吴十",
+    "phone": "13800008888",
+    "city": "上海",
+    "education": "本科",
+    "total_work_years": 6,
+    "expected_salary": "28000-40000",
+    "skills": [
+      "需求分析",
+      "产品设计",
+      "Axure",
+      "SQL"
+    ],
+    "applied_position": "产品经理",
+    "match_score": 88,
+    "score_breakdown": {
+      "行业匹配": 21,
+      "项目经验": 30,
+      "技能熟练度": 18,
+      "稳定性": 12,
+      "学历加分": 7,
+      "作品集加分": 0
+    },
+    "risk_flags": [],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": false,
+    "project_count": 7,
+    "created_at": "2026-03-10T17:46:49.856040"
+  },
+  {
+    "id": "C010",
+    "moka_id": "",
+    "boss_candidate_id": "",
+    "name": "陈二",
+    "phone": "13800000000",
+    "city": "北京",
+    "education": "本科",
+    "total_work_years": 4,
+    "expected_salary": "18000-25000",
+    "skills": [
+      "AE",
+      "PR",
+      "C4D",
+      "Blender",
+      "Photoshop"
+    ],
+    "applied_position": "视觉设计师",
+    "match_score": 86,
+    "score_breakdown": {
+      "行业匹配": 10,
+      "项目经验": 20,
+      "技能熟练度": 27,
+      "稳定性": 7,
+      "学历加分": 7,
+      "作品集加分": 15
+    },
+    "risk_flags": [],
+    "screening_status": "pending_review",
+    "reject_reason": "",
+    "has_portfolio": true,
+    "project_count": 5,
+    "created_at": "2026-03-10T17:46:49.856058"
+  }
+]

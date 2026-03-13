@@ -1,0 +1,6 @@
+# 招聘自动化控制器 - 依赖列表
+streamlit>=1.30.0
+pandas>=2.0.0
+requests>=2.31.0
+pyyaml>=6.0
+cryptography>=41.0.0

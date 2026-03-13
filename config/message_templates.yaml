@@ -1,0 +1,98 @@
+# ============================================
+# 约面话术模板 - 可按职位自定义
+# ============================================
+
+# 默认话术
+default:
+  # 首次约面消息
+  first_contact: |
+    您好！感谢您对{position}职位的关注。
+    我们的面试官对您的简历很感兴趣，想邀请您参加面试。
+    
+    以下是可选的面试时间，请回复对应编号选择：
+    {time_options}
+    
+    面试形式：{interview_type}
+    预计时长：{duration}分钟
+    
+    期待您的回复！
+
+  # 二次触达消息（24小时未回复）
+  followup_first: |
+    您好，之前发送的{position}面试邀请不知道您是否看到了？
+    
+    我们仍有以下时间段可供选择：
+    {time_options}
+    
+    请回复编号选择合适的时间，如有其他时间偏好也可以直接告知～
+
+  # 第二次触达（48小时未回复）
+  followup_second: |
+    您好，再次跟您确认{position}的面试安排。
+    如果您目前不方便面试或有其他考虑，也请告知，我们理解并尊重您的选择。
+    
+    可选时间：
+    {time_options}
+    
+    期待回复！
+
+  # 面试确认消息
+  interview_confirmed: |
+    面试已确认！
+    职位：{position}
+    时间：{interview_time}
+    形式：{interview_type}
+    面试官：{interviewer_name}
+    
+    {extra_info}
+    
+    祝您面试顺利！
+
+  # 时间不匹配时
+  no_time_match: |
+    抱歉，您选择的时间与面试官暂时无法匹配。
+    以下是面试官的其他可选时间：
+    {alternative_times}
+    
+    请回复编号选择，谢谢！
+
+# 按职位自定义话术
+positions:
+  "视觉设计师":
+    first_contact: |
+      您好！我们正在招聘{position}，您的作品集和经验非常匹配。
+      想邀请您参加面试，请选择方便的时间：
+      {time_options}
+      
+      面试形式：{interview_type}（请提前准备作品集展示）
+      预计时长：{duration}分钟
+
+# 时间选项格式模板
+time_option_format: "【{index}】{date} {weekday} {start_time}-{end_time} ({priority})"
+
+# 候选人回复关键词解析规则
+reply_patterns:
+  # 编号选择
+  number_select:
+    - "选{n}"
+    - "选择{n}"
+    - "{n}号"
+    - "第{n}个"
+    - "【{n}】"
+  # 直接时间
+  time_direct:
+    - "{month}月{day}日{hour}点"
+    - "{month}月{day}号{hour}点"
+    - "周{weekday}{hour}点"
+    - "星期{weekday}{hour}:{minute}"
+    - "{month}/{day} {hour}:{minute}"
+  # 拒绝关键词
+  rejection:
+    - "不考虑"
+    - "暂不考虑"
+    - "不方便"
+    - "放弃"
+    - "不去了"
+    - "已找到工作"
+    - "已入职"
+    - "拒绝"

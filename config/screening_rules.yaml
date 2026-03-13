@@ -1,0 +1,96 @@
+# ============================================
+# 简历筛选规则配置 - 按职位自定义
+# ============================================
+
+# 默认筛选规则（所有职位通用）
+default:
+  hard_requirements:
+    min_education: "本科"              # 最低学历: 大专/本科/硕士/博士
+    min_work_years: 3                  # 最低工作年限
+    cities: ["北京", "上海", "深圳", "广州", "杭州"]   # 允许的城市
+    required_skills: []                # 必须具备的核心技能
+    salary_range: [8000, 30000]        # 期望薪资区间 [min, max]
+    require_portfolio: false           # 是否必须有作品集
+
+  scoring_weights:
+    industry_match: 20                 # 行业匹配 (满分20)
+    project_experience: 25            # 项目经验 (满分25)
+    skill_proficiency: 25             # 技能熟练度 (满分25)
+    stability: 15                     # 稳定性-跳槽频率 (满分15)
+    education_bonus: 10               # 学历加分 (满分10)
+    portfolio_bonus: 5                # 作品集加分 (满分5)
+
+  auto_filter:
+    reject_no_project_experience: true
+    reject_irrelevant_position: true
+    reject_keyword_stuffing: true
+    keyword_stuffing_threshold: 15    # 同一技能关键词重复超过此次数判定为堆砌
+    reject_no_portfolio: false
+
+  risk_flags:
+    high_salary_deviation_percent: 30  # 期望薪资偏离岗位区间超过30%标记风险
+    frequent_job_change_threshold: 3   # 3年内跳槽次数超过此值标记风险
+    short_tenure_months: 6             # 单份工作时长低于6个月标记风险
+
+# 按职位的专属规则（覆盖默认值）
+positions:
+  "视觉设计师":
+    hard_requirements:
+      min_education: "本科"
+      min_work_years: 3
+      cities: ["北京", "上海"]
+      required_skills: ["AE", "PR", "C4D", "Photoshop"]
+      salary_range: [15000, 35000]
+      require_portfolio: true
+    scoring_weights:
+      industry_match: 15
+      project_experience: 20
+      skill_proficiency: 30
+      stability: 10
+      education_bonus: 10
+      portfolio_bonus: 15
+    auto_filter:
+      reject_no_project_experience: true
+      reject_irrelevant_position: true
+      reject_keyword_stuffing: true
+      reject_no_portfolio: true
+
+  "后端开发工程师":
+    hard_requirements:
+      min_education: "本科"
+      min_work_years: 3
+      cities: ["北京", "上海", "杭州"]
+      required_skills: ["Java", "Spring"]
+      salary_range: [20000, 50000]
+      require_portfolio: false
+    scoring_weights:
+      industry_match: 15
+      project_experience: 30
+      skill_proficiency: 30
+      stability: 15
+      education_bonus: 10
+      portfolio_bonus: 0
+
+  "产品经理":
+    hard_requirements:
+      min_education: "本科"
+      min_work_years: 5
+      cities: ["北京", "上海"]
+      required_skills: ["需求分析", "产品设计"]
+      salary_range: [20000, 45000]
+      require_portfolio: false
+    scoring_weights:
+      industry_match: 25
+      project_experience: 30
+      skill_proficiency: 20
+      stability: 15
+      education_bonus: 10
+      portfolio_bonus: 0
+
+# 学历等级映射（用于比较）
+education_levels:
+  "高中": 1
+  "大专": 2
+  "本科": 3
+  "硕士": 4
+  "博士": 5

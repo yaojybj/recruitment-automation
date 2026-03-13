@@ -1,0 +1,11 @@
+候选人ID,姓名,电话,邮箱,城市,学历,学校,工作年限,期望薪资,技能,项目数量,有作品集,作品集链接,应聘职位,来源,阶段
+C001,张三,13800001111,zhangsan@email.com,北京,本科,北京大学,5,20000-30000,"AE,PR,C4D,Photoshop,Illustrator",6,是,https://portfolio.example.com/zs,视觉设计师,Boss直聘,待筛选
+C002,李四,13800002222,lisi@email.com,上海,硕士,复旦大学,3,25000-35000,"AE,PR,After Effects,Sketch",4,是,https://portfolio.example.com/ls,视觉设计师,Boss直聘,待筛选
+C003,王五,13800003333,wangwu@email.com,深圳,大专,深圳职业技术学院,2,15000-20000,"Photoshop",1,否,,视觉设计师,Boss直聘,待筛选
+C004,赵六,13800004444,zhaoliu@email.com,北京,本科,清华大学,7,30000-45000,"Java,Spring,MySQL,Redis,Kafka,Docker",8,否,,后端开发工程师,Boss直聘,待筛选
+C005,钱七,13800005555,qianqi@email.com,杭州,本科,浙江大学,4,25000-40000,"Java,Spring,PostgreSQL,Redis",5,否,,后端开发工程师,Boss直聘,待筛选
+C006,孙八,13800006666,sunba@email.com,成都,本科,电子科技大学,3,18000-25000,"Python,Django",2,否,,后端开发工程师,Boss直聘,待筛选
+C007,周九,13800007777,zhoujiu@email.com,北京,硕士,北京理工大学,8,35000-50000,"需求分析,产品设计,数据分析,用户研究",10,否,,产品经理,Boss直聘,待筛选
+C008,吴十,13800008888,wushi@email.com,上海,本科,同济大学,6,28000-40000,"需求分析,产品设计,Axure,SQL",7,否,,产品经理,Boss直聘,待筛选
+C009,郑一,13800009999,zhengyi@email.com,广州,大专,广州大学,1,8000-12000,"PR,剪辑",0,否,,视觉设计师,Boss直聘,待筛选
+C010,陈二,13800000000,chener@email.com,北京,本科,中国传媒大学,4,18000-25000,"AE,PR,C4D,Blender,Photoshop",5,是,https://portfolio.example.com/ce,视觉设计师,Boss直聘,待筛选

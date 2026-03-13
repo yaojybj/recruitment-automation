@@ -1,0 +1,70 @@
+# ============================================
+# 招聘自动化控制器 - 主配置文件
+# ============================================
+
+# Moka API 配置（二选一鉴权方式）
+moka:
+  api_enabled: false                     # 设为 true 并填写下方密钥后启用
+  org_id: ""                             # Moka 租户 ID（向 CSM 索取）
+  # 鉴权方式1: Basic Auth
+  api_key: ""                            # 向 Moka CSM 索取
+  # 鉴权方式2: OAuth2
+  client_id: ""                          # 向 Moka CSM 索取
+  client_secret: ""                      # 向 Moka CSM 索取
+  retry_max: 3
+  retry_delay_seconds: 5
+  rate_limit_per_minute: 60
+
+# Moka CSV 兜底配置
+moka_csv:
+  enabled: false
+  import_directory: "./data/moka_csv_import"
+  export_directory: "./data/moka_csv_export"
+  watch_interval_seconds: 60
+
+# Boss 直聘插件配置
+boss:
+  plugin_api_url: "http://localhost:8800"  # Boss 插件本地 API 端口
+  plugin_ws_url: "ws://localhost:8800/ws"
+  message_send_timeout_seconds: 10
+  message_check_interval_seconds: 30
+
+# 轮询频率配置
+polling:
+  moka_pending_interview_minutes: 5      # 待约面状态监听间隔
+  candidate_response_check_minutes: 30   # 候选人未回复检测间隔
+  screening_batch_minutes: 10            # 简历筛选批处理间隔
+
+# 约面规则
+scheduling:
+  candidate_response_timeout_hours: 24   # 候选人回复超时时间
+  max_followup_retries: 2                # 二次触达最大重试次数
+  followup_cooldown_hours: 24            # 两次触达间隔
+  interview_create_timeout_minutes: 5    # 面试创建超时
+  auto_create_interview: true            # 匹配成功后自动创建面试
+
+# 筛选配置
+screening:
+  min_match_score: 85                    # 最低匹配分
+  accuracy_alert_threshold: 0.80         # 筛选准确率低于此值时弹窗提醒
+  enable_auto_filter: true               # 启用自动过滤层
+  require_human_review: true             # 强制人工复核
+
+# 日志配置
+logging:
+  level: "INFO"                          # DEBUG / INFO / WARNING / ERROR
+  log_directory: "./data/logs"
+  max_log_size_mb: 50
+  backup_count: 10
+  log_to_console: true
+
+# 通知配置
+notification:
+  enable_desktop_notification: true
+  enable_sound: false
+  critical_events:
+    - "interview_created"
+    - "interview_create_failed"
+    - "api_failure_after_retry"
+    - "screening_accuracy_low"
+    - "candidate_match_ambiguous"

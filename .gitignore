@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.db
+
+# Node
+node_modules/
+dist/
+
+# Uploads
+backend/uploads/inbox/*
+backend/uploads/archived/*
+!backend/uploads/inbox/.gitkeep
+!backend/uploads/archived/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+data/logs/
