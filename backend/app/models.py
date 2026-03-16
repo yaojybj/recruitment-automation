@@ -215,6 +215,29 @@ class PipelineLog(Base):
     resume = relationship("Resume")
 
 
+class ExtensionTask(Base):
+    """插件任务队列：后台派发任务给 Chrome 插件执行"""
+    __tablename__ = "extension_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_type = Column(String(50), nullable=False)
+    platform = Column(String(20), nullable=False)  # "boss" or "moka"
+    resume_id = Column(Integer, ForeignKey("resumes.id"), nullable=True)
+    position_id = Column(Integer, ForeignKey("positions.id"), nullable=True)
+    payload = Column(JSON, default=dict)
+    status = Column(String(20), default="pending")  # pending / running / done / failed
+    result = Column(JSON)
+    error = Column(Text)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+
+    resume = relationship("Resume")
+    position = relationship("Position")
+
+
 class BossConfig(Base):
     """Boss 直聘自动化配置"""
     __tablename__ = "boss_configs"

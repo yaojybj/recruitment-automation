@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Moka 招聘自动化助手",
+  "version": "1.0.0",
+  "description": "在 Moka 中自动创建候选人、推荐给用人部门、安排面试，与招聘自动化后台联动",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://app.mokahr.com/*",
+    "https://*.mokahr.com/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://app.mokahr.com/*", "https://*.mokahr.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Moka 招聘助手"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

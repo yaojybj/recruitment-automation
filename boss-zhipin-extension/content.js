@@ -1,12 +1,14 @@
 /**
  * Boss直聘 招聘自动化助手 - Content Script
- * 在 Boss 直聘推荐页/候选人列表/聊天页注入操作按钮和匹配分数
+ * 功能：
+ * 1. 候选人列表页：扫描、导入、评分徽章
+ * 2. 聊天页：自动发送约面消息、捕获候选人回复
+ * 3. 任务轮询：从后台获取待执行任务并自动执行
  */
 
 (() => {
   'use strict';
 
-  const BOSS_GREEN = '#00BEAB';
   let enabled = true;
   let autoImport = false;
   let showBadge = true;
@@ -15,6 +17,7 @@
   let processedCards = new WeakSet();
   let importedCandidates = new Map();
   let screener = null;
+  let taskPollInterval = null;
 
   async function init() {
     const stored = await chrome.storage.sync.get([
@@ -35,9 +38,14 @@
     injectFloatingToolbar();
     observePageChanges();
     setTimeout(() => processPage(), 1500);
+
+    startTaskPolling();
+    startReplyCapture();
   }
 
-  // ─── API 调用 ───
+  // ═══════════════════════════════════
+  //  API
+  // ═══════════════════════════════════
 
   async function apiCall(method, endpoint, body) {
     const opts = {
@@ -55,7 +63,344 @@
     return resp.json();
   }
 
-  // ─── 浮动工具栏 ───
+  // ═══════════════════════════════════
+  //  任务轮询：从后台获取待办任务
+  // ═══════════════════════════════════
+
+  function startTaskPolling() {
+    if (taskPollInterval) return;
+    pollTasks();
+    taskPollInterval = setInterval(pollTasks, 30000);
+  }
+
+  async function pollTasks() {
+    try {
+      const tasks = await apiCall('GET', '/api/extension/pending-tasks?platform=boss');
+      if (!tasks || tasks.length === 0) return;
+
+      updateToolbarTaskCount(tasks.length);
+
+      if (!isOnChatPage()) {
+        showToast(`有 ${tasks.length} 个待发消息，请打开聊天页面`);
+        return;
+      }
+
+      for (const task of tasks) {
+        if (task.task_type === 'boss_send_message') {
+          await handleSendMessageTask(task);
+        }
+      }
+    } catch {
+      // backend offline, ignore
+    }
+  }
+
+  function isOnChatPage() {
+    return location.pathname.includes('/chat') ||
+           location.pathname.includes('/message') ||
+           !!document.querySelector('[class*="chat"], [class*="message-list"]');
+  }
+
+  async function handleSendMessageTask(task) {
+    const { candidate_name, message, boss_candidate_id } = task.payload || {};
+    if (!message) return;
+
+    showTaskConfirmDialog(task, candidate_name, message);
+  }
+
+  function showTaskConfirmDialog(task, name, message) {
+    let dialog = document.getElementById('boss-ext-task-dialog');
+    if (dialog) dialog.remove();
+
+    dialog = document.createElement('div');
+    dialog.id = 'boss-ext-task-dialog';
+    dialog.innerHTML = `
+      <div class="boss-ext-dialog-overlay"></div>
+      <div class="boss-ext-dialog-box">
+        <div class="boss-ext-dialog-header">
+          <h3>待发送约面消息</h3>
+          <button class="boss-ext-dialog-close" id="boss-ext-dialog-close">✕</button>
+        </div>
+        <div class="boss-ext-dialog-body">
+          <div class="boss-ext-dialog-field">
+            <label>候选人</label>
+            <div class="boss-ext-dialog-value">${name}</div>
+          </div>
+          <div class="boss-ext-dialog-field">
+            <label>消息内容</label>
+            <textarea id="boss-ext-msg-text" rows="8">${message}</textarea>
+          </div>
+          <div class="boss-ext-dialog-hint">
+            请先在左侧聊天列表中找到 <strong>${name}</strong>，打开聊天窗口后点击发送。
+          </div>
+        </div>
+        <div class="boss-ext-dialog-footer">
+          <button class="boss-ext-dialog-btn secondary" id="boss-ext-copy-msg">📋 复制消息</button>
+          <button class="boss-ext-dialog-btn secondary" id="boss-ext-auto-send">🚀 自动填入并发送</button>
+          <button class="boss-ext-dialog-btn primary" id="boss-ext-mark-sent">✅ 已手动发送</button>
+          <button class="boss-ext-dialog-btn" id="boss-ext-skip-task">跳过</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+
+    document.getElementById('boss-ext-dialog-close').onclick = () => dialog.remove();
+    document.getElementById('boss-ext-skip-task').onclick = () => dialog.remove();
+
+    document.getElementById('boss-ext-copy-msg').onclick = () => {
+      const text = document.getElementById('boss-ext-msg-text').value;
+      copyToClipboard(text);
+      showToast('消息已复制，请粘贴到聊天窗口');
+    };
+
+    document.getElementById('boss-ext-auto-send').onclick = async () => {
+      const text = document.getElementById('boss-ext-msg-text').value;
+      const sent = await autoFillAndSend(text);
+      if (sent) {
+        await reportTaskDone(task.id, true);
+        dialog.remove();
+        showToast(`✅ 已自动发送给 ${name}`);
+      }
+    };
+
+    document.getElementById('boss-ext-mark-sent').onclick = async () => {
+      await reportTaskDone(task.id, true);
+      dialog.remove();
+      showToast(`✅ 已标记为已发送: ${name}`);
+    };
+  }
+
+  async function autoFillAndSend(message) {
+    const inputSelectors = [
+      '[class*="chat-input"] textarea',
+      '[class*="message-input"] textarea',
+      '[class*="chat"] textarea',
+      '.chat-input textarea',
+      'textarea[placeholder*="请输入"]',
+      'textarea[class*="input"]',
+      '[contenteditable="true"]',
+    ];
+
+    let input = null;
+    for (const sel of inputSelectors) {
+      input = document.querySelector(sel);
+      if (input) break;
+    }
+
+    if (!input) {
+      showToast('未找到聊天输入框，请先打开聊天窗口', true);
+      return false;
+    }
+
+    if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {
+      input.value = message;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      input.textContent = message;
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, data: message }));
+    }
+
+    await new Promise(r => setTimeout(r, 500));
+
+    const sendBtnSelectors = [
+      '[class*="btn-send"]',
+      '[class*="send-btn"]',
+      'button[class*="send"]',
+      '[class*="chat"] button[class*="primary"]',
+      'button:has(span:contains("发送"))',
+    ];
+
+    let sendBtn = null;
+    for (const sel of sendBtnSelectors) {
+      try {
+        sendBtn = document.querySelector(sel);
+        if (sendBtn) break;
+      } catch { /* invalid selector */ }
+    }
+
+    if (!sendBtn) {
+      const allBtns = document.querySelectorAll('button, [role="button"]');
+      for (const btn of allBtns) {
+        if (btn.textContent.trim() === '发送' || btn.textContent.includes('发送')) {
+          sendBtn = btn;
+          break;
+        }
+      }
+    }
+
+    if (sendBtn) {
+      sendBtn.click();
+      return true;
+    } else {
+      showToast('消息已填入，请手动点击发送按钮');
+      return false;
+    }
+  }
+
+  async function reportTaskDone(taskId, success, result = {}) {
+    try {
+      await apiCall('POST', `/api/extension/task-start/${taskId}`);
+      await apiCall('POST', `/api/extension/task-complete/${taskId}`, {
+        success,
+        result,
+      });
+    } catch (err) {
+      console.error('Report task failed:', err);
+    }
+  }
+
+  function updateToolbarTaskCount(count) {
+    let badge = document.getElementById('boss-ext-task-badge');
+    if (!badge) {
+      const toolbar = document.getElementById('boss-ext-toolbar');
+      if (!toolbar) return;
+      badge = document.createElement('span');
+      badge.id = 'boss-ext-task-badge';
+      badge.className = 'boss-ext-task-badge';
+      toolbar.querySelector('.boss-ext-toolbar-inner').appendChild(badge);
+    }
+    badge.textContent = `${count} 待办`;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  // ═══════════════════════════════════
+  //  自动捕获候选人回复
+  // ═══════════════════════════════════
+
+  let lastChatObserver = null;
+  let capturedReplies = new Set();
+
+  function startReplyCapture() {
+    if (!isOnChatPage()) return;
+
+    const chatObserver = new MutationObserver(() => {
+      clearTimeout(window._replyDebounce);
+      window._replyDebounce = setTimeout(checkForNewReplies, 2000);
+    });
+
+    const chatContainer = document.querySelector(
+      '[class*="message-list"], [class*="chat-content"], [class*="chat-message"]'
+    );
+    if (chatContainer) {
+      chatObserver.observe(chatContainer, { childList: true, subtree: true });
+      lastChatObserver = chatObserver;
+    }
+  }
+
+  async function checkForNewReplies() {
+    try {
+      const awaiting = await apiCall('GET', '/api/pipeline/awaiting-replies');
+      if (!awaiting || awaiting.length === 0) return;
+
+      const awaitingNames = new Map();
+      for (const r of awaiting) {
+        awaitingNames.set(r.name, r.id);
+      }
+
+      const currentChatName = getCurrentChatName();
+      if (!currentChatName) return;
+
+      const resumeId = awaitingNames.get(currentChatName);
+      if (!resumeId) return;
+
+      const replyKey = `${resumeId}_${Date.now()}`;
+      if (capturedReplies.has(resumeId)) return;
+
+      const lastReply = getLastReceivedMessage();
+      if (!lastReply) return;
+
+      capturedReplies.add(resumeId);
+
+      showReplyConfirmDialog(resumeId, currentChatName, lastReply);
+    } catch {
+      // ignore
+    }
+  }
+
+  function getCurrentChatName() {
+    const selectors = [
+      '[class*="chat-header"] [class*="name"]',
+      '[class*="chat-info"] [class*="name"]',
+      '[class*="nickname"]',
+      '.chat-person .name',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const name = el.textContent.trim();
+        if (name.length >= 2 && name.length <= 10) return name;
+      }
+    }
+    return null;
+  }
+
+  function getLastReceivedMessage() {
+    const msgSelectors = [
+      '[class*="message-item"][class*="left"]',
+      '[class*="msg-item"][class*="received"]',
+      '[class*="message"][class*="other"]',
+      '.message-left',
+    ];
+
+    for (const sel of msgSelectors) {
+      const msgs = document.querySelectorAll(sel);
+      if (msgs.length > 0) {
+        const last = msgs[msgs.length - 1];
+        const textEl = last.querySelector('[class*="text"], [class*="content"], p');
+        if (textEl) return textEl.textContent.trim();
+      }
+    }
+    return null;
+  }
+
+  function showReplyConfirmDialog(resumeId, name, replyText) {
+    let dialog = document.getElementById('boss-ext-reply-dialog');
+    if (dialog) dialog.remove();
+
+    dialog = document.createElement('div');
+    dialog.id = 'boss-ext-reply-dialog';
+    dialog.innerHTML = `
+      <div class="boss-ext-dialog-overlay"></div>
+      <div class="boss-ext-dialog-box">
+        <div class="boss-ext-dialog-header">
+          <h3>候选人回复捕获</h3>
+          <button class="boss-ext-dialog-close" onclick="this.closest('#boss-ext-reply-dialog').remove()">✕</button>
+        </div>
+        <div class="boss-ext-dialog-body">
+          <div class="boss-ext-dialog-field">
+            <label>候选人</label>
+            <div class="boss-ext-dialog-value">${name}</div>
+          </div>
+          <div class="boss-ext-dialog-field">
+            <label>捕获到的回复</label>
+            <textarea id="boss-ext-reply-text" rows="3">${replyText}</textarea>
+          </div>
+          <div class="boss-ext-dialog-hint">确认后系统将自动解析时间并安排面试</div>
+        </div>
+        <div class="boss-ext-dialog-footer">
+          <button class="boss-ext-dialog-btn primary" id="boss-ext-submit-reply">✅ 确认提交</button>
+          <button class="boss-ext-dialog-btn" onclick="this.closest('#boss-ext-reply-dialog').remove()">忽略</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+
+    document.getElementById('boss-ext-submit-reply').onclick = async () => {
+      const text = document.getElementById('boss-ext-reply-text').value;
+      try {
+        await apiCall('POST', `/api/pipeline/candidate-reply/${resumeId}`, { reply_text: text });
+        showToast(`✅ ${name} 的回复已提交，系统正在安排面试`);
+      } catch (err) {
+        showToast('提交失败: ' + err.message, true);
+      }
+      dialog.remove();
+    };
+  }
+
+  // ═══════════════════════════════════
+  //  浮动工具栏
+  // ═══════════════════════════════════
 
   function injectFloatingToolbar() {
     if (document.getElementById('boss-ext-toolbar')) return;
@@ -66,10 +411,13 @@
       <div class="boss-ext-toolbar-inner">
         <div class="boss-ext-toolbar-title">招聘助手</div>
         <button class="boss-ext-btn" id="boss-ext-scan" title="扫描当前页候选人">
-          🔍 扫描页面
+          🔍 扫描
         </button>
-        <button class="boss-ext-btn" id="boss-ext-import-all" title="导入所有识别到的候选人">
+        <button class="boss-ext-btn" id="boss-ext-import-all" title="导入所有候选人">
           📥 全部导入
+        </button>
+        <button class="boss-ext-btn" id="boss-ext-check-tasks" title="检查待办任务">
+          📋 检查待办
         </button>
         <span class="boss-ext-counter" id="boss-ext-count">0 人</span>
         <button class="boss-ext-btn boss-ext-btn-sm" id="boss-ext-minimize" title="最小化">—</button>
@@ -79,6 +427,7 @@
 
     document.getElementById('boss-ext-scan').addEventListener('click', () => processPage());
     document.getElementById('boss-ext-import-all').addEventListener('click', importAllVisible);
+    document.getElementById('boss-ext-check-tasks').addEventListener('click', pollTasks);
     document.getElementById('boss-ext-minimize').addEventListener('click', toggleToolbar);
   }
 
@@ -90,7 +439,9 @@
     btn.textContent = bar.classList.contains('boss-ext-minimized') ? '□' : '—';
   }
 
-  // ─── 页面扫描 ───
+  // ═══════════════════════════════════
+  //  页面扫描（候选人列表页）
+  // ═══════════════════════════════════
 
   function processPage() {
     if (!enabled) return;
@@ -120,15 +471,9 @@
 
   function findCandidateCards() {
     const selectors = [
-      '.candidate-card',
-      '.resume-card-wrap',
-      '.card-inner',
-      '[class*="candidate-wrap"]',
-      '[class*="recommend-card"]',
-      '.job-card-wrap',
-      '.resume-item',
-      '[ka*="recommend"]',
-      'li[class*="item"]',
+      '.candidate-card', '.resume-card-wrap', '.card-inner',
+      '[class*="candidate-wrap"]', '[class*="recommend-card"]',
+      '.job-card-wrap', '.resume-item', '[ka*="recommend"]', 'li[class*="item"]',
     ];
 
     for (const sel of selectors) {
@@ -164,19 +509,9 @@
   function parseCardInfo(card) {
     const text = card.textContent || '';
     const candidate = {
-      name: '',
-      education: '',
-      workYears: 0,
-      city: '',
-      skills: [],
-      experiences: [],
-      projectCount: 0,
-      hasPortfolio: false,
-      company: '',
-      position: '',
-      age: null,
-      phone: '',
-      bossId: '',
+      name: '', education: '', workYears: 0, city: '', skills: [],
+      experiences: [], projectCount: 0, hasPortfolio: false,
+      company: '', position: '', age: null, phone: '', bossId: '',
     };
 
     const nameEl = card.querySelector(
@@ -184,8 +519,7 @@
       '[class*="title-name"], a[ka*="name"]'
     );
     if (nameEl) {
-      let raw = nameEl.textContent.trim();
-      raw = raw.replace(/[®©™✓✗●○◆★☆\s·|]/g, '').substring(0, 10);
+      let raw = nameEl.textContent.trim().replace(/[®©™✓✗●○◆★☆\s·|]/g, '').substring(0, 10);
       if (raw.length >= 2 && raw.length <= 6) candidate.name = raw;
     }
     if (!candidate.name) {
@@ -209,8 +543,7 @@
     if (cityMatch) candidate.city = cityMatch[1];
 
     const tags = card.querySelectorAll(
-      '[class*="tag"], [class*="label"], [class*="skill"], ' +
-      'span[class*="desc"], [class*="info-desc"]'
+      '[class*="tag"], [class*="label"], [class*="skill"], span[class*="desc"], [class*="info-desc"]'
     );
     tags.forEach(tag => {
       const tt = tag.textContent.trim();
@@ -221,9 +554,6 @@
 
     const companyMatch = text.match(/(?:在|·|丨)\s*(.{2,20}(?:公司|集团|科技|有限|网络|互联|教育|医疗|金融|银行|证券|基金|投资|咨询|传媒|文化|信息|软件|硬件|电子|通信|游戏|电商|平台))/);
     if (companyMatch) candidate.company = companyMatch[1];
-
-    const posMatch = text.match(/(?:求职|期望|目标)[：:]\s*(.{2,20})/);
-    if (posMatch) candidate.position = posMatch[1];
 
     const link = card.querySelector('a[href*="/geek/"], a[href*="/resume/"]');
     if (link) {
@@ -250,7 +580,9 @@
     return candidate;
   }
 
-  // ─── 注入分数徽章 ───
+  // ═══════════════════════════════════
+  //  分数徽章 + 操作按钮
+  // ═══════════════════════════════════
 
   function injectScoreBadge(card, result) {
     const existing = card.querySelector('.boss-ext-badge');
@@ -271,12 +603,7 @@
       badge.innerHTML = `<span class="boss-ext-score-text">${score}分</span>`;
     }
 
-    badge.addEventListener('click', e => {
-      e.stopPropagation();
-      e.preventDefault();
-      showDetailPanel(result);
-    });
-
+    badge.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); showDetailPanel(result); });
     card.style.position = card.style.position || 'relative';
     card.appendChild(badge);
   }
@@ -284,18 +611,9 @@
   function showDetailPanel(result) {
     let panel = document.getElementById('boss-ext-detail');
     if (panel) panel.remove();
-
     panel = document.createElement('div');
     panel.id = 'boss-ext-detail';
-
-    let html = `
-      <div class="boss-ext-panel-header">
-        <h3>筛选详情</h3>
-        <button onclick="this.closest('#boss-ext-detail').remove()">✕</button>
-      </div>
-      <div class="boss-ext-panel-body">
-    `;
-
+    let html = `<div class="boss-ext-panel-header"><h3>筛选详情</h3><button onclick="this.closest('#boss-ext-detail').remove()">✕</button></div><div class="boss-ext-panel-body">`;
     if (result.autoFilterReason) {
       html += `<div class="boss-ext-panel-status reject">自动淘汰: ${result.autoFilterReason}</div>`;
     } else if (result.hardFail) {
@@ -303,12 +621,10 @@
     } else {
       const cls = result.score >= 85 ? 'pass' : result.score >= 70 ? 'maybe' : 'low';
       html += `<div class="boss-ext-panel-status ${cls}">匹配分: ${result.score} / 100</div>`;
-
       if (result.breakdown) {
         html += '<div class="boss-ext-breakdown"><h4>分项评分</h4><table>';
         for (const [key, val] of Object.entries(result.breakdown)) {
-          const w = Math.min(val * 4, 100);
-          html += `<tr><td class="bd-label">${key}</td><td class="bd-bar"><div class="bd-fill" style="width:${w}%"></div></td><td class="bd-val">${val}</td></tr>`;
+          html += `<tr><td class="bd-label">${key}</td><td class="bd-bar"><div class="bd-fill" style="width:${Math.min(val*4,100)}%"></div></td><td class="bd-val">${val}</td></tr>`;
         }
         html += '</table></div>';
       }
@@ -323,12 +639,8 @@
     document.body.appendChild(panel);
   }
 
-  // ─── 注入操作按钮 ───
-
   function injectActionButtons(card, candidate) {
-    const existing = card.querySelector('.boss-ext-actions');
-    if (existing) return;
-
+    if (card.querySelector('.boss-ext-actions')) return;
     const wrap = document.createElement('div');
     wrap.className = 'boss-ext-actions';
 
@@ -346,18 +658,15 @@
             matchBtn.textContent = '匹配中...';
             try {
               const mr = await apiCall('POST', `/api/pipeline/jd-match/${result.resume_id}`, null);
-              const score = mr.score || mr.jd_match_score || 0;
-              matchBtn.textContent = `🎯 ${Math.round(score)}分`;
+              matchBtn.textContent = `🎯 ${Math.round(mr.score || 0)}分`;
               matchBtn.classList.add('boss-ext-btn-done');
-            } catch (err) {
-              matchBtn.textContent = '匹配失败';
-            }
+            } catch { matchBtn.textContent = '匹配失败'; }
           });
           wrap.appendChild(matchBtn);
         }
 
         if (result.resume_id) {
-          const msgBtn = createBtn('💬 约面消息', async () => {
+          const msgBtn = createBtn('💬 约面', async () => {
             msgBtn.textContent = '生成中...';
             try {
               const mr = await apiCall('POST', `/api/pipeline/generate-message/${result.resume_id}`);
@@ -377,7 +686,6 @@
       }
     });
     wrap.appendChild(importBtn);
-
     card.style.position = card.style.position || 'relative';
     card.appendChild(wrap);
   }
@@ -386,18 +694,16 @@
     const btn = document.createElement('button');
     btn.className = 'boss-ext-action-btn';
     btn.textContent = text;
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      e.preventDefault();
-      onClick();
-    });
+    btn.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); onClick(); });
     return btn;
   }
 
-  // ─── 导入候选人 ───
+  // ═══════════════════════════════════
+  //  导入候选人
+  // ═══════════════════════════════════
 
   async function importCandidate(candidate) {
-    const payload = {
+    return apiCall('POST', '/api/extension/import-candidate', {
       candidate_name: candidate.name,
       education: candidate.education || null,
       work_years: candidate.workYears || null,
@@ -409,22 +715,14 @@
       boss_candidate_id: candidate.bossId || null,
       source: 'boss_extension',
       position_id: defaultPositionId ? parseInt(defaultPositionId) : null,
-      raw_text: buildRawText(candidate),
-    };
-    return apiCall('POST', '/api/extension/import-candidate', payload);
-  }
-
-  function buildRawText(c) {
-    const parts = [];
-    if (c.name) parts.push(`姓名: ${c.name}`);
-    if (c.education) parts.push(`学历: ${c.education}`);
-    if (c.workYears) parts.push(`工作年限: ${c.workYears}年`);
-    if (c.city) parts.push(`城市: ${c.city}`);
-    if (c.age) parts.push(`年龄: ${c.age}岁`);
-    if (c.company) parts.push(`公司: ${c.company}`);
-    if (c.position) parts.push(`职位: ${c.position}`);
-    if (c.skills.length) parts.push(`技能: ${c.skills.join(', ')}`);
-    return parts.join('\n');
+      raw_text: [
+        candidate.name && `姓名: ${candidate.name}`,
+        candidate.education && `学历: ${candidate.education}`,
+        candidate.workYears && `工作年限: ${candidate.workYears}年`,
+        candidate.city && `城市: ${candidate.city}`,
+        candidate.company && `公司: ${candidate.company}`,
+      ].filter(Boolean).join('\n'),
+    });
   }
 
   async function importAllVisible() {
@@ -441,7 +739,9 @@
     showToast(`已导入 ${imported} 位候选人`);
   }
 
-  // ─── 辅助函数 ───
+  // ═══════════════════════════════════
+  //  工具函数
+  // ═══════════════════════════════════
 
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).catch(() => {
@@ -466,18 +766,13 @@
     setTimeout(() => toast.remove(), 3000);
   }
 
-  // ─── MutationObserver ───
-
   function observePageChanges() {
     const observer = new MutationObserver(mutations => {
       let hasNew = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
           for (const node of m.addedNodes) {
-            if (node.nodeType === 1 && node.textContent && node.textContent.length > 30) {
-              hasNew = true;
-              break;
-            }
+            if (node.nodeType === 1 && node.textContent && node.textContent.length > 30) { hasNew = true; break; }
           }
         }
         if (hasNew) break;
@@ -489,8 +784,6 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
-
-  // ─── 启动 ───
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

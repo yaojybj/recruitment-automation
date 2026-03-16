@@ -1,0 +1,240 @@
+/* ========== Moka 招聘助手 - 悬浮面板 ========== */
+
+#moka-ext-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 320px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  z-index: 99999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+#moka-ext-panel.moka-ext-minimized .moka-ext-panel-body { display: none; }
+#moka-ext-panel.moka-ext-minimized { width: 160px; }
+
+.moka-ext-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #4A90D9, #357ABD);
+  color: #fff;
+  cursor: move;
+  user-select: none;
+}
+
+.moka-ext-panel-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.moka-ext-badge {
+  padding: 1px 7px;
+  background: #ff4d4f;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.moka-ext-panel-toggle {
+  border: none;
+  background: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.moka-ext-panel-body {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+
+.moka-ext-status {
+  font-size: 12px;
+  color: #52c41a;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 8px;
+}
+
+/* ========== 任务列表 ========== */
+
+.moka-ext-task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.moka-ext-task-info { flex: 1; }
+
+.moka-ext-task-type {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #e6f4ff;
+  color: #1677ff;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.moka-ext-task-name {
+  font-size: 13px;
+  color: #333;
+}
+
+.moka-ext-task-exec {
+  padding: 4px 12px;
+  border: 1px solid #4A90D9;
+  border-radius: 4px;
+  background: #fff;
+  color: #4A90D9;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.moka-ext-task-exec:hover {
+  background: #4A90D9;
+  color: #fff;
+}
+
+/* ========== 操作日志 ========== */
+
+.moka-ext-log {
+  margin-top: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.moka-ext-log-line {
+  font-size: 11px;
+  color: #888;
+  padding: 2px 0;
+  border-bottom: 1px solid #fafafa;
+  line-height: 1.5;
+}
+
+/* ========== 手动操作指引面板 ========== */
+
+#moka-ext-guide {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  z-index: 200000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  animation: mokaGuideSlideIn 0.3s ease;
+}
+
+@keyframes mokaGuideSlideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.moka-ext-guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #4A90D9, #357ABD);
+  color: #fff;
+  border-radius: 12px 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.moka-ext-guide-btn {
+  padding: 4px 12px;
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 4px;
+  background: none;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.moka-ext-guide-btn.done {
+  background: rgba(255,255,255,0.2);
+}
+
+.moka-ext-guide-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.moka-ext-guide-body {
+  padding: 16px;
+}
+
+.moka-ext-guide-body h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+.moka-ext-guide-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.moka-ext-guide-body td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.moka-ext-guide-body td:first-child {
+  color: #888;
+  width: 80px;
+}
+
+.moka-ext-guide-body td:last-child {
+  color: #333;
+}
+
+.moka-ext-guide-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+/* ========== Toast ========== */
+
+#moka-ext-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: #4A90D9;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 300000;
+  box-shadow: 0 4px 15px rgba(74,144,217,0.3);
+  animation: mokaToastIn 0.3s ease;
+}
+
+#moka-ext-toast.moka-ext-toast-err {
+  background: #ff4d4f;
+  box-shadow: 0 4px 15px rgba(255,77,79,0.3);
+}
+
+@keyframes mokaToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
